@@ -13,20 +13,53 @@ void render_template(const char *template, Data *data, int data_count, char **ou
 
 int main() {
     // Sample template string
-    const char *template = 
-        "<html>\n"
-        "<head><title>{{title}}</title></head>\n"
-        "<body>\n"
-        "    <h1>{{heading}}</h1>\n"
-        "    <p>{{content}}</p>\n"
-        "</body>\n"
-        "</html>";
+    FILE *file = fopen("index.html", "rb");
+    if (!file)
+    {
+        perror("Failed to open file");
+        return 1;
+    }
+
+    fseek(file, 0, SEEK_END); // seek to end of file
+    size_t file_size = ftell(file); // get current file pointer
+    rewind(file); // seek back to beginning of file
+    
+    if (file_size < 0)
+    {
+        perror("Failed to get file size");
+        fclose(file);
+        return 1;
+    }
+
+    printf("Size = %u\n", file_size);
+
+    // Allocate template for file content
+    char *template = (char*)malloc(file_size + 1);
+
+    if (!template)
+    {
+        perror("Failed to process template");
+        fclose(file);
+        return 1;
+    }
+
+    size_t read_size = fread(template, 1, file_size, file);
+    
+    printf("read_size = %u\n", read_size);
+
+    if (read_size != file_size)
+    {
+        perror("Failed to read the file");
+        free(template);
+        fclose(file);
+        return 1;
+    }
 
     // Data to replace placeholders
     Data data[] = {
         {"title", "Template Challenge"},
         {"heading", "Welcome to the Challenge!"},
-        {"content", "Your task is to complete the templating engine logic."}
+        {"content", "My name is Bryan."}
     };
 
     int data_count = sizeof(data) / sizeof(data[0]);
@@ -34,6 +67,9 @@ int main() {
 
     // Render the template
     render_template(template, data, data_count, &output);
+
+    // Free template once done with render_template
+    free(template);
 
     if (output) {
         // Print the rendered template
@@ -49,8 +85,9 @@ int main() {
 void render_template(const char *template, Data *data, int data_count, char **output) {
     size_t buffer_size = 1024; // Initial buffer size
     char *buffer = malloc(buffer_size);
+
     if (!buffer) {
-        fprintf(stderr, "Memory allocation failed\n");
+        fprintf(stderr, "Memory allocation failed for template buffer\n");
         return;
     }
 
