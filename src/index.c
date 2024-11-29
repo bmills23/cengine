@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Includes read_file() func.
+#include "common.h"
+
 // Define a structure for holding key-value pairs
 typedef struct {
     const char *key;
@@ -13,48 +16,8 @@ void render_template(const char *template, Data *data, int data_count, char **ou
 
 int main() {
     // Sample template string
-    FILE *file = fopen("index.html", "rb");
-    if (!file)
-    {
-        perror("Failed to open file");
-        return 1;
-    }
-
-    fseek(file, 0, SEEK_END); // seek to end of file
-    size_t file_size = ftell(file); // get current file pointer
-    rewind(file); // seek back to beginning of file
+    char* content = read_file("../pages/index.html");
     
-    if (file_size < 0)
-    {
-        perror("Failed to get file size");
-        fclose(file);
-        return 1;
-    }
-
-    printf("Size = %u\n", file_size);
-
-    // Allocate template for file content
-    char *template = (char*)malloc(file_size + 1);
-
-    if (!template)
-    {
-        perror("Failed to process template");
-        fclose(file);
-        return 1;
-    }
-
-    size_t read_size = fread(template, 1, file_size, file);
-    
-    printf("read_size = %u\n", read_size);
-
-    if (read_size != file_size)
-    {
-        perror("Failed to read the file");
-        free(template);
-        fclose(file);
-        return 1;
-    }
-
     // Data to replace placeholders
     Data data[] = {
         {"title", "Template Challenge"},
@@ -66,10 +29,10 @@ int main() {
     char *output = NULL;
 
     // Render the template
-    render_template(template, data, data_count, &output);
+    render_template(content, data, data_count, &output);
 
     // Free template once done with render_template
-    free(template);
+    free(content);
 
     if (output) {
         // Print the rendered template

@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Includes readfile
+#include "common.h"
+
 #if defined(_WIN32) || defined(_WIN64)
     #include <winsock2.h>
     #include <ws2tcpip.h>
@@ -28,29 +31,6 @@
 void error_exit(const char* message) {
     perror(message);
     exit(EXIT_FAILURE);
-}
-
-char* read_file(const char* filename) {
-    FILE* file = fopen(filename, "r");
-    if (!file) {
-        perror("Error opening file");
-        return NULL;
-    }
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    rewind(file);
-
-    char* content = malloc(file_size + 1);
-    if (!content) {
-        perror("Memory allocation error");
-        fclose(file);
-        return NULL;
-    }
-
-    fread(content, 1, file_size, file);
-    content[file_size] = '\0';
-    fclose(file);
-    return content;
 }
 
 void serve_file(int client_fd, const char* filename, const char* content_type) {
@@ -91,10 +71,10 @@ void handle_client_request(int client_fd) {
     sscanf(buffer, "%s %s", method, route);
 
     // Check the route and serve the appropriate file
-    if (strcmp(route, "/") == 0 || strcmp(route, "/index.html") == 0) {
-        serve_file(client_fd, "index.html", "text/html");
-    } else if (strcmp(route, "/about.html") == 0) {
-        serve_file(client_fd, "about.html", "text/html");
+    if (strcmp(route, "/") == 0) {
+        serve_file(client_fd, "../pages/index.html", "text/html");
+    } else if (strcmp(route, "/about") == 0) {
+        serve_file(client_fd, "../pages/about.html", "text/html");
     } else {
         const char* not_found_response =
             "HTTP/1.1 404 Not Found\r\n"
