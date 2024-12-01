@@ -61,10 +61,16 @@ void render_template(const char *template, Data *data, int data_count, char **ou
         if (*ptr == '{' && *(ptr + 1) == '{') {
             // Find the closing braces
             const char *start = ptr + 2;
-            const char *end = strstr(start, "}}");
-            if (end) {
+
+            // Various templating engine endings
+            // }} = unescaped data
+            const char *end1 = strstr(start, "}}");
+            // -} = escaped data 
+            // const char *end2 = strstr(start, "-}");
+
+            if (end1) {
                 // Extract the key
-                size_t key_size = end - start;
+                size_t key_size = end1 - start;
                 char key[key_size + 1];
                 strncpy(key, start, key_size);
                 key[key_size] = '\0';
@@ -97,9 +103,9 @@ void render_template(const char *template, Data *data, int data_count, char **ou
                     strcat(buffer, replacement);
                 }
 
-                ptr = end + 2; // Move past }}
+                ptr = end1 + 2; // Move past }}
                 continue;
-            }
+            } 
         }
 
         // Add the current character to the buffer

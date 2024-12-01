@@ -2,13 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Includes readfile
+// Includes read_file
 #include "common.h"
+
+// Includes define_route
+#include "def.h"
 
 #if defined(_WIN32) || defined(_WIN64)
     #include <winsock2.h>
     #include <ws2tcpip.h>
     #pragma comment(lib, "ws2_32.lib")
+    
+    // Function to initialize Winsock on Windows
     void initialize_winsock() {
         WSADATA wsaData;
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -16,9 +21,11 @@
             exit(EXIT_FAILURE);
         }
     }
+
     #define CLOSE_SOCKET closesocket
     typedef int ssize_t;
 #else
+    // Includes for Unix-like systems
     #include <unistd.h>
     #include <arpa/inet.h>
     #include <sys/socket.h>
