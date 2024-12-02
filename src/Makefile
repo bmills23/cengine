@@ -15,16 +15,12 @@ endif
 COMMON_SRC = common.c
 COMMON_HDR = common.h
 
-# Route Handler
-DEF_SRC = def.c
-DEF_HDR = def.h
-
 # Targets
 TARGETS = index server
 
 # Pattern Rule for Targets
-%: %.c $(COMMON_SRC) $(COMMON_HDR) $(DEF_SRC) $(DEF_HDR)
-	$(CC) $(CFLAGS) $< $(COMMON_SRC) $(DEF_SRC) -o $@ $(LIBS)
+%: %.c $(COMMON_SRC) $(COMMON_HDR)
+	$(CC) $(CFLAGS) $< $(COMMON_SRC) -o $@ $(LIBS)
 
 # Clean Rule
 clean:

@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Includes read_file
+#include <dirent.h>
+#include <errno.h>
+
+// Includes read_file & serve_file
 #include "common.h"
 
-// Includes define_route
-#include "def.h"
+int MAX_FILENAME_LENGTH = 100;
 
 #if defined(_WIN32) || defined(_WIN64)
     #include <winsock2.h>
@@ -21,6 +23,8 @@
             exit(EXIT_FAILURE);
         }
     }
+
+    #include <windows.h>
 
     #define CLOSE_SOCKET closesocket
     typedef int ssize_t;
@@ -76,6 +80,84 @@ void handle_client_request(int client_fd) {
     // Extract the requested route
     char method[16], route[256];
     sscanf(buffer, "%s %s", method, route);
+
+    // Directory Read for Page rendering
+    #if defined(_WIN32) || defined(_WIN64)
+        const char *directory_path = "../pages"; // page directory
+        WIN32_FIND_DATA find_file_data;
+        HANDLE hFind;
+
+        char search_path[MAX_PATH];
+        snprintf(search_path, MAX_PATH, "%s\\*", directory_path); // Append wildcard
+
+        hFind = FindFirstFile(search_path, &find_file_data);
+
+        if (hFind == INVALID_HANDLE_VALUE) {
+            printf("Error opening directory\n");
+            return;
+        }
+
+        printf("Files in directory '%s':\n", directory_path);
+
+        do {
+            printf("%s\n", find_file_data.cFileName); // Print file name
+        } while (FindNextFile(hFind, &find_file_data) != 0);
+
+        FindClose(hFind); // Close handle
+    # else
+        const char *directory_path = "../pages"; // pages directory
+        struct dirent *entry;          
+        DIR *directory = opendir(directory_path); 
+
+        if (directory == NULL) {
+            perror("Unable to open directory");
+            return;
+        }
+
+        printf("Files in directory '%s':\n", directory_path);
+
+        // Amount of files in the pages directory
+        int file_amount;
+
+        while ((entry = readdir(directory)) != NULL) {
+            file_amount++;
+        }
+
+        // Allocate array for file names
+        char** files = malloc(file_amount * sizeof(char*));
+
+        if (files == NULL) {
+            perror("Memory allocation failed");
+            return; // Handle memory allocation failure
+        }
+
+        // Example: Allocate memory for each string
+        for (int i = 0; i < file_amount; i++) {
+            files[i] = malloc(MAX_FILENAME_LENGTH * sizeof(char));
+            if (files[i] == NULL) {
+                perror("Memory allocation failed for string");
+                return; // Handle memory allocation failure
+            }
+        }
+
+        // // Free memory after usage
+        // for (int i = 0; i < file_amount; i++) {
+        //     free(files[i]);
+        // }
+
+        // free(files);
+
+        int i = 0;
+
+        // Not working
+        while ((entry = readdir(directory)) != NULL) {
+            files[i] = entry->d_name;
+            printf("File Name: %s\n", files[i]);
+            i++;
+        }
+
+        closedir(directory); // Close directory
+    # endif
 
     // Check the route and serve the appropriate file
     if (strcmp(route, "/") == 0) {
