@@ -5,7 +5,7 @@
 #include <dirent.h>
 #include <errno.h>
 
-// Includes read_file & serve_file
+// Includes read_file & remove_html_extension
 #include "common.h"
 
 int MAX_FILENAME_LENGTH = 100;
@@ -81,9 +81,7 @@ void handle_client_request(int client_fd) {
     char method[16], route[256];
     sscanf(buffer, "%s %s", method, route);
 
-    // Directory Read for Page rendering
     #if defined(_WIN32) || defined(_WIN64)
-        const char *directory_path = "../pages"; // page directory
         WIN32_FIND_DATA find_file_data;
         HANDLE hFind;
 
@@ -91,19 +89,62 @@ void handle_client_request(int client_fd) {
         snprintf(search_path, MAX_PATH, "%s\\*", directory_path); // Append wildcard
 
         hFind = FindFirstFile(search_path, &find_file_data);
-
-        if (hFind == INVALID_HANDLE_VALUE) {
+        if (hFind == INVALID_HANDLE_VALUE) 
+        {
             printf("Error opening directory\n");
             return;
         }
 
-        printf("Files in directory '%s':\n", directory_path);
+        // Count valid files in the directory
+        while (FindNextFile(hFind, &find_file_data) != 0)
+        {
+            if (strcmp(find_file_data.cFileName, ".") != 0 && strcmp(find_file_data.cFileName, "..") != 0) 
+            {
+                file_amount++;
+            }
+        }
 
-        do {
-            printf("%s\n", find_file_data.cFileName); // Print file name
-        } while (FindNextFile(hFind, &find_file_data) != 0);
+        // Allocate array for file names
+        files = malloc(file_amount * sizeof(char *));
+        if (files == NULL) 
+        {
+            perror("Memory allocation failed");
+            FindClose(hFind);
+            return; // Handle memory allocation failure
+        }
 
-        FindClose(hFind); // Close handle
+        for (int i = 0; i < file_amount; i++) 
+        {
+            files[i] = malloc(MAX_FILENAME_LENGTH * sizeof(char));
+            if (files[i] == NULL) 
+            {
+                perror("Memory allocation failed for string");
+                FindClose(hFind);
+                return; // Handle memory allocation failure
+            }
+        }
+
+        // Reset and read file names into the allocated array
+        FindClose(hFind);
+        hFind = FindFirstFile(search_path, &find_file_data);
+        if (hFind == INVALID_HANDLE_VALUE) 
+        {
+            printf("Error reopening directory\n");
+            return;
+        }
+
+        int i = 0;
+        while (FindNextFile(hFind, &find_file_data) != 0)
+        {
+            if (strcmp(find_file_data.cFileName, ".") != 0 || strcmp(find_file_data.cFileName, "..") != 0) {
+                strncpy(files[i], find_file_data.cFileName, MAX_FILENAME_LENGTH);
+                files[i][MAX_FILENAME_LENGTH - 1] = '\0'; // Ensure null-termination
+                remove_html_extension(files[i]);
+                i++;
+            }
+        } 
+
+        FindClose(hFind); // Close the handle
     # else
         const char *directory_path = "../pages"; // pages directory
         struct dirent *entry;          
@@ -117,11 +158,16 @@ void handle_client_request(int client_fd) {
         printf("Files in directory '%s':\n", directory_path);
 
         // Amount of files in the pages directory
-        int file_amount;
+        int file_amount = 0;
 
         while ((entry = readdir(directory)) != NULL) {
-            file_amount++;
+            if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0)
+            {
+                file_amount++;
+            }
         }
+
+        printf("file_amount: %i\n", file_amount);
 
         // Allocate array for file names
         char** files = malloc(file_amount * sizeof(char*));
@@ -140,37 +186,73 @@ void handle_client_request(int client_fd) {
             }
         }
 
-        // // Free memory after usage
-        // for (int i = 0; i < file_amount; i++) {
-        //     free(files[i]);
-        // }
-
-        // free(files);
-
+        // Reset directory stream to read file names
+        rewinddir(directory);
         int i = 0;
 
-        // Not working
-        while ((entry = readdir(directory)) != NULL) {
-            files[i] = entry->d_name;
-            printf("File Name: %s\n", files[i]);
-            i++;
+        // Store file names in the allocated array
+        while ((entry = readdir(directory)) != NULL) 
+        {
+            if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0)
+            {
+                strncpy(files[i], entry->d_name, MAX_FILENAME_LENGTH);
+                files[i][MAX_FILENAME_LENGTH - 1] = '\0'; // Ensure null-termination
+                remove_html_extension(files[i]);
+                i++;
+            }
         }
 
         closedir(directory); // Close directory
     # endif
 
     // Check the route and serve the appropriate file
-    if (strcmp(route, "/") == 0) {
-        serve_file(client_fd, "../pages/index.html", "text/html");
-    } else if (strcmp(route, "/about") == 0) {
-        serve_file(client_fd, "../pages/about.html", "text/html");
-    } else {
+    int file_found = 0;
+
+    for (int i = 0; i < file_amount; i++)
+    {
+        char file_name[MAX_FILENAME_LENGTH];
+        snprintf(file_name, sizeof(file_name), "/%s", files[i]);
+        printf("Route: %s, File: %s\n", route, file_name);
+
+        if (strcmp(route, file_name) == 0)  // Match the route to a file
+        {
+            char file_path[MAX_FILENAME_LENGTH];
+            snprintf(file_path, sizeof(file_path), "../pages%s.html", file_name);
+            printf("File Path: %s\n", file_path);
+            serve_file(client_fd, file_path, "text/html");
+            file_found = 1;
+            break;
+        }
+    }
+
+    // Fallback for the root route "/"
+    if (!file_found)
+    {
+        if (strcmp(route, "/") == 0)
+        {
+            serve_file(client_fd, "../pages/index.html", "text/html");
+        }
+        else
+        {
+            // Handle 404 Not Found or other default behavior
+            serve_file(client_fd, "../pages/404.html", "text/html");
+        }
+    }
+
+    if (!file_found) {
         const char* not_found_response =
             "HTTP/1.1 404 Not Found\r\n"
             "Content-Type: text/plain\r\n\r\n"
             "404 Not Found";
         send(client_fd, not_found_response, strlen(not_found_response), 0);
     }
+
+    // Free memory after usage
+    for (int i = 0; i < file_amount; i++) {
+        free(files[i]);
+    }
+
+    free(files);
 }
 
 int main() {

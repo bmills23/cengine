@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
-
 #define BUFFER_SIZE 1024
 
 char* read_file(const char* filename) {
@@ -30,3 +28,14 @@ char* read_file(const char* filename) {
     fclose(file);
     return content;
 }
+
+ // Remove .html extension
+void remove_html_extension(char *filename) 
+{
+    char *extension = strstr(filename, ".html"); // Find ".html" in the string
+    if (extension != NULL) 
+    {
+        *extension = '\0'; // Truncate the string at the start of ".html"
+    }
+}
+
